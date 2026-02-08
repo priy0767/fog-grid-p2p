@@ -2,7 +2,7 @@
 
 ![Project Status](https://img.shields.io/badge/Status-Hackathon%20Ready-success)
 ![Tech Stack](https://img.shields.io/badge/Tech-React%20%7C%20WebRTC%20%7C%20PeerJS-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+
 
 > **A decentralized computing grid that turns smartphones and laptops into a unified supercomputer using nothing but a web browser.**
 
