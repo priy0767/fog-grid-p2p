@@ -3,13 +3,13 @@
 ![Project Status](https://img.shields.io/badge/Status-Hackathon%20Ready-success)
 ![Tech Stack](https://img.shields.io/badge/Tech-React%20%7C%20WebRTC%20%7C%20PeerJS-blue)
 
-
 > **A decentralized computing grid that turns smartphones and laptops into a unified supercomputer using nothing but a web browser.**
 
 ---
 
 ## 👨‍💻 Created By
-**Priyanshu Soni** *B.Tech Computer Science Engineering*
+**Priyanshu Soni**
+*B.Tech Computer Science Engineering*
 
 ---
 
@@ -44,6 +44,6 @@ The system follows a **Master-Slave (Star Topology)** architecture.
 
 ```mermaid
 graph TD
-    Host[💻 HOST (Laptop)] <==>|WebRTC Data Channel| Worker1[📱 WORKER 1]
-    Host <==>|WebRTC Data Channel| Worker2[📱 WORKER 2]
-    Host <==>|WebRTC Data Channel| Worker3[📱 WORKER 3]
+    Host[💻 HOST Laptop] <-->|WebRTC Data Channel| Worker1[📱 WORKER 1]
+    Host <-->|WebRTC Data Channel| Worker2[📱 WORKER 2]
+    Host <-->|WebRTC Data Channel| Worker3[📱 WORKER 3]
