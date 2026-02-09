@@ -3,7 +3,7 @@ import Peer from 'peerjs';
 
 export default function HostDashboard() {
   const [peerId, setPeerId] = useState(null);
-  const [workers, setWorkers] = useState([]);
+  const [workers, setWorkers] = useState([]); // Just for UI count
   const [logs, setLogs] = useState([]);
   const [isWorking, setIsWorking] = useState(false);
   const [file, setFile] = useState(null);
@@ -11,13 +11,12 @@ export default function HostDashboard() {
   const [targetResult, setTargetResult] = useState(null);
   
   const peerRef = useRef(null);
-  const connectionsRef = useRef([]);
+  const connectionsRef = useRef([]); // Stores actual DataConnection objects
 
-  // 1. PURE JS ENCRYPTION (No API, Safe for HTTP)
+  // 1. HEAVY MATH LOGIC
   const calculateHeavyHash = (pin) => {
     let hash = 0;
     const pinNum = parseInt(pin);
-    // Same math as the worker
     for (let i = 0; i < 150000; i++) {
         hash = (hash + pinNum * i) % 9999999;
         hash = (hash * 33) ^ i;
@@ -27,13 +26,10 @@ export default function HostDashboard() {
 
   const lockFile = () => {
     if (!targetPin || targetPin.length !== 4) {
-        alert("Please set a 4-digit PIN (0000-9999) to lock the file.");
+        alert("Please set a 4-digit PIN (0000-9999).");
         return;
     }
-    
     addLog(`🔒 ENCRYPTING FILE (Heavy Computation)...`);
-    
-    // Slight delay to simulate work on the UI
     setTimeout(() => {
         const result = calculateHeavyHash(targetPin);
         setTargetResult(result);
@@ -43,27 +39,22 @@ export default function HostDashboard() {
   };
 
   const startJob = () => {
-    if (!targetResult) {
-        alert("Lock the file first!");
-        return;
-    }
-    if (connectionsRef.current.length === 0) {
-        alert("No workers connected!");
-        return;
-    }
+    if (!targetResult) { alert("Lock file first!"); return; }
+    if (connectionsRef.current.length === 0) { alert("No workers!"); return; }
 
     setIsWorking(true);
-    addLog(`🚀 STARTING DISTRIBUTED ATTACK ON PIN RANGE [0000-9999]`);
+    addLog(`🚀 STARTING DISTRIBUTED ATTACK...`);
 
-    const totalRange = 10000;
+    const totalRange = 10000; // 0000 to 9999
     const workerCount = connectionsRef.current.length;
     const chunkSize = Math.floor(totalRange / workerCount);
 
     connectionsRef.current.forEach((conn, index) => {
         const start = index * chunkSize;
+        // Ensure the last worker picks up the remainder
         const end = (index === workerCount - 1) ? totalRange - 1 : (start + chunkSize - 1);
 
-        addLog(`📤 NODE ${index+1}: Scanning ${start} - ${end}`);
+        addLog(`📤 NODE ${index+1} assigned range: ${start} - ${end}`);
         
         conn.send({
             type: 'START_WORK',
@@ -75,6 +66,9 @@ export default function HostDashboard() {
   };
 
   useEffect(() => {
+    // Prevent double-init in React Strict Mode
+    if (peerRef.current) return;
+
     const peer = new Peer();
     peerRef.current = peer;
 
@@ -85,8 +79,9 @@ export default function HostDashboard() {
 
     peer.on('connection', (conn) => {
       conn.on('open', () => {
-        addLog(`NEW WORKER: ${conn.peer}`);
+        addLog(`🟢 NEW WORKER CONNECTED: ${conn.peer}`);
         connectionsRef.current.push(conn);
+        // Update UI state
         setWorkers(prev => [...prev, conn.peer]);
       });
 
@@ -95,15 +90,27 @@ export default function HostDashboard() {
             if (data.result) {
                 setIsWorking(false);
                 addLog(`💎 PASSWORD CRACKED: ${data.result}`);
-                alert(`SUCCESS! The PDF PIN is: ${data.result}`);
+                alert(`SUCCESS! PIN FOUND: ${data.result}`);
+                // Stop all other workers
                 connectionsRef.current.forEach(c => c.send({type: 'ABORT'}));
             } else {
-                addLog(`✅ Worker finished range (Not found).`);
+                addLog(`✅ Node finished range (Not found).`);
             }
         }
       });
+
+      // Optional: Handle disconnects
+      conn.on('close', () => {
+        addLog(`🔴 WORKER DISCONNECTED: ${conn.peer}`);
+        connectionsRef.current = connectionsRef.current.filter(c => c.peer !== conn.peer);
+        setWorkers(prev => prev.filter(id => id !== conn.peer));
+      });
     });
-    return () => peer.destroy();
+
+    return () => {
+        peer.destroy();
+        peerRef.current = null;
+    };
   }, []);
 
   const addLog = (msg) => setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
@@ -111,52 +118,73 @@ export default function HostDashboard() {
   return (
     <div className="min-h-screen bg-black text-green-500 font-mono p-8">
       <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-        <h1 className="text-3xl font-bold">FOG GRID: PDF PIN CRACKER</h1>
-        <div className="bg-gray-900 px-4 py-2 rounded text-white border border-gray-700">
-            HOST ID: {peerId}
+        <h1 className="text-3xl font-bold">FOG GRID: MASTER NODE</h1>
+        <div className="text-right">
+             <p className="text-xs text-gray-500">HOST ID</p>
+             <div className="bg-gray-900 px-4 py-2 rounded text-white border border-gray-700 select-all">
+                {peerId || "INITIALIZING..."}
+             </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* LEFT PANEL */}
+        {/* CONTROLS */}
         <div className="space-y-6">
-            
-            <div className="border border-green-800 p-6 rounded bg-gray-900/50">
-                <h2 className="text-xl text-white mb-4">1. UPLOAD & LOCK</h2>
-                <input type="file" onChange={(e) => setFile(e.target.files[0])} className="mb-4 text-sm text-gray-400"/>
+            {/* STEP 1 */}
+            <div className="border border-green-800 p-6 rounded bg-gray-900/30">
+                <h2 className="text-xl text-white mb-4">1. TARGET</h2>
+                <input type="file" onChange={(e) => setFile(e.target.files[0])} className="mb-4 text-sm text-gray-400 w-full"/>
                 {file && (
                     <>
-                        <p className="text-xs text-gray-400 mb-1">Set a Demo PIN (0000-9999):</p>
+                        <p className="text-xs text-green-400 mb-1">Set PIN (0000-9999):</p>
                         <input 
                             type="number" 
-                            placeholder="1234" 
-                            className="w-full bg-black border border-green-600 p-2 text-white mb-4 text-center tracking-widest"
+                            placeholder="e.g. 8500" 
+                            className="w-full bg-black border border-green-600 p-2 text-white mb-4 text-center text-xl tracking-widest outline-none focus:border-green-400 transition-colors"
                             onChange={(e) => setTargetPin(e.target.value)}
                         />
-                        <button onClick={lockFile} className="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm">
-                            🔒 ENCRYPT FILE
+                        <button onClick={lockFile} className="w-full bg-green-900/50 hover:bg-green-800 border border-green-600 text-white py-2 rounded transition-all">
+                            🔒 LOCK FILE
                         </button>
                     </>
                 )}
             </div>
 
-            <div className="border border-green-800 p-6 rounded bg-gray-900/50">
+            {/* STEP 2 */}
+            <div className="border border-green-800 p-6 rounded bg-gray-900/30">
                 <h2 className="text-xl text-white mb-2">2. CLUSTER</h2>
-                <div className="text-4xl font-bold mb-2">{workers.length} <span className="text-sm font-normal text-gray-400">NODES</span></div>
+                <div className="flex justify-between items-end mb-4">
+                    <span className="text-gray-400">ACTIVE NODES:</span>
+                    <span className="text-4xl font-bold text-green-400">{workers.length}</span>
+                </div>
                 <button 
                     onClick={startJob}
                     disabled={isWorking || !targetResult}
-                    className={`w-full py-4 text-lg font-bold rounded transition-all ${isWorking ? 'bg-red-900 text-red-200' : 'bg-green-600 hover:bg-green-500 text-black'}`}
+                    className={`w-full py-4 text-lg font-bold rounded shadow-[0_0_15px_rgba(0,255,0,0.2)] transition-all ${
+                        isWorking 
+                        ? 'bg-red-900/80 text-white animate-pulse cursor-wait' 
+                        : 'bg-green-600 hover:bg-green-500 text-black'
+                    }`}
                 >
-                    {isWorking ? "CRACKING IN PROGRESS..." : "⚡ START DISTRIBUTED ATTACK"}
+                    {isWorking ? "⚠ BRUTE FORCING..." : "⚡ START ATTACK"}
                 </button>
             </div>
         </div>
 
-        {/* RIGHT PANEL: LOGS */}
-        <div className="col-span-2 bg-black border border-gray-800 p-4 rounded h-[500px] overflow-y-auto font-mono text-sm">
-            {logs.map((log, i) => <div key={i} className="mb-1 border-l-2 border-green-900 pl-2">{log}</div>)}
+        {/* LOGS */}
+        <div className="col-span-2 bg-black border border-green-900 p-4 rounded h-[500px] flex flex-col shadow-inner">
+            <div className="flex justify-between border-b border-green-900 pb-2 mb-2">
+                <span className="text-gray-500">TERMINAL OUTPUT</span>
+                <span className="text-xs text-green-600 animate-pulse">● LIVE</span>
+            </div>
+            <div className="flex-1 overflow-y-auto font-mono text-sm space-y-1 scrollbar-thin scrollbar-thumb-green-900">
+                {logs.map((log, i) => (
+                    <div key={i} className="border-l-2 border-green-800 pl-2 hover:bg-green-900/20">
+                        {log}
+                    </div>
+                ))}
+            </div>
         </div>
       </div>
     </div>
